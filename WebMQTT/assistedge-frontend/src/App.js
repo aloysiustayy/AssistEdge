@@ -33,7 +33,7 @@ function App() {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const response = await fetch('http://localhost:5001/sign-language');
+        const response = await fetch('http://localhost:5001/data');
         if (response.ok) {
           // Assuming the JSON response has a structure like: { sign_language: ["hello", "thanks", ...] }
           const data = await response.json();

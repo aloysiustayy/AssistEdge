@@ -1,3 +1,5 @@
 numpy
 tensorflow
 opencv-python
+netifaces
+python-nmap

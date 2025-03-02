@@ -1,0 +1,4 @@
+hbmqtt
+paho-mqtt
+flask
+flask-cors
