@@ -1,9 +1,11 @@
 import threading
+import multiprocessing
 import asyncio
 from hbmqtt.broker import Broker
 import paho.mqtt.client as mqtt
 from flask import Flask, jsonify
 from flask_cors import CORS
+import time
 
 # ---------------------------
 # MQTT Broker (HBMQTT) Setup
@@ -18,17 +20,25 @@ broker_config = {
     'sys_interval': 10,
     'auth': {
         'allow-anonymous': True
+    },
+    'topic-check': {   # Disable topic-checking to avoid warnings
+        'enabled': False
     }
 }
 
-broker = Broker(broker_config)
-
-async def start_broker():
-    await broker.start()
-
-def broker_thread():
-    # Run the broker using asyncio in this thread
-    asyncio.run(start_broker())
+def run_broker():
+    # This function runs in a separate process.
+    from hbmqtt.broker import Broker  # Re-import in the child process
+    broker = Broker(broker_config)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(broker.start())
+        loop.run_forever()
+    except Exception as e:
+        print("Broker startup failed:", e)
+    finally:
+        loop.close()
 
 # ---------------------------
 # Global Data Store for MQTT Messages
@@ -41,7 +51,7 @@ data_store = {
 # ---------------------------
 # MQTT Client (paho-mqtt) Setup
 # ---------------------------
-# Use localhost since the broker runs in this combined script.
+# Use localhost since the broker runs in the same machine (in a separate process).
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 TOPIC_SIGN = "assistedge/sign_language"
@@ -73,6 +83,7 @@ def mqtt_client_thread():
         client.connect(MQTT_BROKER, MQTT_PORT, 60)
     except Exception as e:
         print("Error connecting to MQTT broker:", e)
+        return
     client.loop_forever()
 
 # ---------------------------
@@ -94,16 +105,20 @@ def get_translated_sign():
     return jsonify({'sign_language': data_store["sign_language"]})
 
 # ---------------------------
-# Main: Start Broker, MQTT Client, and Flask App
+# Main: Start Broker (in separate process), MQTT Client (in thread), and Flask App
 # ---------------------------
 if __name__ == '__main__':
-    # Start the MQTT broker in its own thread.
-    broker_thread_obj = threading.Thread(target=broker_thread, daemon=True)
-    broker_thread_obj.start()
+    # Start the MQTT broker in a separate process.
+    broker_process = multiprocessing.Process(target=run_broker, daemon=True)
+    broker_process.start()
+    print("Broker process started.")
 
-    # Start the MQTT client in another thread.
+    # Start the MQTT client in a separate thread.
     client_thread = threading.Thread(target=mqtt_client_thread, daemon=True)
     client_thread.start()
 
     # Run the Flask webserver (listening on port 5001).
     app.run(host='0.0.0.0', port=5001, debug=True)
+
+    # When the Flask app terminates, you might want to terminate the broker process.
+    broker_process.terminate()
