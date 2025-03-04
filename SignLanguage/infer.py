@@ -11,7 +11,7 @@ import time
 # =============================
 # Network Discovery Functions
 # =============================
-
+#wlan0
 def get_network_range(interface='wlan0'):
     """
     Retrieve the local network range based on the IP and netmask of the specified interface.
@@ -50,7 +50,7 @@ def choose_broker_ip():
     Discover devices on the local network and prompt the user to select one.
     Returns the selected device's IP address.
     """
-    network_range = get_network_range('wlan0')
+    network_range = get_network_range('en0')
     if not network_range:
         print("Could not determine network range. Ensure 'wlan0' is active.")
         return None
@@ -139,6 +139,8 @@ def main():
         'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 
         'U', 'V', 'W', 'X', 'Y', 'Z', 'Space', 'Delete', 'Nothing'
     ]
+    
+    prev_pred_class = ""
 
     try:
         while True:
@@ -152,14 +154,23 @@ def main():
             pred_index = np.argmax(output_data)
             pred_class = classes[pred_index] if pred_index < len(classes) else "unknown"
             confidence = np.max(output_data)
+            
+            # Only publish if confidence is high and new prediction is different from the previous one.
+            if confidence > 0.78 and pred_class != prev_pred_class:
+                print(f"Predicting: {pred_class} with {confidence} confidence")
+                display_text = f"{pred_class}: {confidence:.2f}"
+                cv2.putText(frame, display_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                cv2.imshow("Sign Language Recognition", frame)
 
-            display_text = f"{pred_class}: {confidence:.2f}"
-            cv2.putText(frame, display_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                        1, (0, 255, 0), 2, cv2.LINE_AA)
-            cv2.imshow("Sign Language Recognition", frame)
-
-            # Publish translated text over MQTT
-            mqtt_client.publish(MQTT_TOPIC, pred_class)
+                mqtt_client.publish(MQTT_TOPIC, pred_class)
+                prev_pred_class = pred_class
+            else:
+                # Optionally, update display without publishing if needed.
+                display_text = f"{pred_class}: {confidence:.2f}"
+                cv2.putText(frame, display_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                cv2.imshow("Sign Language Recognition", frame)
+            
+            
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
