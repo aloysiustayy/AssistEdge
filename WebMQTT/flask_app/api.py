@@ -3,9 +3,11 @@ import multiprocessing
 import asyncio
 from hbmqtt.broker import Broker
 import paho.mqtt.client as mqtt
-from flask import Flask, jsonify
+from flask import Flask, jsonify, Response, request
 from flask_cors import CORS
-import time
+import base64
+import cv2
+import numpy as np
 
 # ---------------------------
 # MQTT Broker (HBMQTT) Setup
@@ -91,6 +93,44 @@ def mqtt_client_thread():
 # ---------------------------
 app = Flask(__name__)
 CORS(app)
+
+latest_frame = None
+latest_emotion_counts = {}  # Stores count of each emotion
+
+@app.route('/upload_frame', methods=['POST'])
+def upload_frame():
+    """Receives video frames & emotion counts from Raspberry Pi."""
+    global latest_frame, latest_emotion_counts
+    try:
+        data = request.json
+        frame_base64 = data.get("frame", "")
+        latest_emotion_counts = data.get("emotion_counts", {})
+
+        if frame_base64:
+            img_bytes = base64.b64decode(frame_base64)
+            img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+            latest_frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+        return "Frame received", 200
+    except Exception as e:
+        return f"Error: {e}", 500
+
+@app.route('/video_feed')
+def video_feed():
+    """Serves video stream to React."""
+    def generate():
+        while True:
+            if latest_frame is not None:
+                _, buffer = cv2.imencode('.jpg', latest_frame)
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+    
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/emotion_counts')
+def get_emotion_counts():
+    """Sends the latest emotion count data to React."""
+    return latest_emotion_counts, 200
 
 @app.route('/')
 def index():
