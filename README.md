@@ -35,10 +35,13 @@ Start two separate terminal inside the two folders: SignLanguage, EmotionDetecti
 `python infer.py`
 
 #### 4.2 On Local computer
-Start two separate terminal inside WebMQTT folder\
-    1. Backend (Flask)\
-    `cd flask_app`\
-    `python api.py`\
-    2. Frontend (React)\
-    `cd assistedge-frontend`\
-    `npm start`
+- Start Mosquitto Broker on root directory.\
+    `mosquitto -c mosquitto.conf`
+
+- Start two separate terminal inside WebMQTT folder\
+        1. Backend (Flask)\
+        `cd flask_app`\
+        `python api.py`\
+        2. Frontend (React)\
+        `cd assistedge-frontend`\
+        `npm start`
