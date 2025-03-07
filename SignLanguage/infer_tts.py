@@ -8,7 +8,7 @@ import tensorflow as tf
 import paho.mqtt.client as mqtt
 import time
 import queue
-import pyttsx3  # for text-to-speech
+import pyttsx3
 
 # =============================
 # Network Discovery Functions
@@ -63,14 +63,11 @@ def choose_broker_ip():
         return None
 
 # =============================
-# TensorFlow Lite Inference Setup
+# Keras Model Inference Setup (.h5)
 # =============================
-MODEL_PATH = "asl.tflite"
-interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
-input_shape = input_details[0]['shape']
+MODEL_PATH = "cnn8grps_rad1_model.h5"
+model = tf.keras.models.load_model(MODEL_PATH)
+input_shape = model.input_shape  # e.g., (None, height, width, channels)
 input_height, input_width = input_shape[1], input_shape[2]
 
 def preprocess_frame(frame):
@@ -81,9 +78,7 @@ def preprocess_frame(frame):
 
 def run_inference(frame):
     input_data = preprocess_frame(frame)
-    interpreter.set_tensor(input_details[0]['index'], input_data)
-    interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])
+    output_data = model.predict(input_data)
     return output_data
 
 # =============================
@@ -94,24 +89,27 @@ tts_queue = queue.Queue()
 def tts_worker():
     engine = pyttsx3.init()
     last_spoken_time = 0
-    cooldown = 2.0  # seconds
+    cooldown = 2.0  # seconds between speeches
     last_text = ""
     while True:
         try:
-            # Wait for a new text to speak (blocking)
             text = tts_queue.get(timeout=1)
             current_time = time.time()
-            # Only speak if cooldown has passed and text is different
             if (current_time - last_spoken_time) > cooldown and text != last_text:
-                engine.say(text)
-                engine.runAndWait()
+                try:
+                    engine.say(text)
+                    engine.runAndWait()
+                except RuntimeError as e:
+                    if "run loop already started" in str(e):
+                        print("TTS engine run loop already started; skipping TTS for:", text)
+                    else:
+                        raise
                 last_spoken_time = current_time
                 last_text = text
             tts_queue.task_done()
         except queue.Empty:
             continue
 
-# Start TTS worker thread
 tts_thread = threading.Thread(target=tts_worker, daemon=True)
 tts_thread.start()
 
@@ -124,7 +122,7 @@ def main():
         print("No valid MQTT broker selected. Exiting.")
         return
 
-    MQTT_BROKER = chosen_ip  
+    MQTT_BROKER = chosen_ip  # Use the selected IP as broker
     MQTT_PORT = 1883
     MQTT_TOPIC = "assistedge/sign_language"
 
@@ -141,12 +139,20 @@ def main():
         print("Error: Could not open webcam.")
         return
 
-    classes = [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 
+    # classes = [
+    #     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 
+    #     'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 
+    #     'U', 'V', 'W', 'X', 'Y', 'Z', 'Space', 'Delete', 'Nothing'
+    # ]
+
+    classes = [str(x).lower() for x in 
+        ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 
         'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 
-        'U', 'V', 'W', 'X', 'Y', 'Z', 'Space', 'Delete', 'Nothing'
+        'U', 'V', 'W', 'X', 'Y', 'Z']
     ]
+
     
+    print(classes)
     prev_pred_class = ""
     try:
         while True:
@@ -161,14 +167,13 @@ def main():
             pred_class = classes[pred_index] if pred_index < len(classes) else "unknown"
             confidence = np.max(output_data)
             
-            # Only publish and speak if confidence is high and the new prediction is different.
             if confidence > 0.78 and pred_class != prev_pred_class:
                 print(f"Predicting: {pred_class} with {confidence} confidence")
                 display_text = f"{pred_class}: {confidence:.2f}"
                 cv2.putText(frame, display_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                 cv2.imshow("Sign Language Recognition", frame)
+
                 mqtt_client.publish(MQTT_TOPIC, pred_class)
-                # Add the new text to the TTS queue
                 tts_queue.put(pred_class)
                 prev_pred_class = pred_class
             else:
@@ -178,6 +183,7 @@ def main():
             
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
             time.sleep(0.1)
     except KeyboardInterrupt:
         print("Exiting...")

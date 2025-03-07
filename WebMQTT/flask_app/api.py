@@ -149,16 +149,16 @@ def get_translated_sign():
 # ---------------------------
 if __name__ == '__main__':
     # Start the MQTT broker in a separate process.
-    broker_process = multiprocessing.Process(target=run_broker, daemon=True)
-    broker_process.start()
-    print("Broker process started.")
+    # broker_process = multiprocessing.Process(target=run_broker, daemon=True)
+    # broker_process.start()
+    # print("Broker process started.")
 
     # Start the MQTT client in a separate thread.
     client_thread = threading.Thread(target=mqtt_client_thread, daemon=True)
     client_thread.start()
 
     # Run the Flask webserver (listening on port 5001).
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
 
     # When the Flask app terminates, you might want to terminate the broker process.
     broker_process.terminate()
