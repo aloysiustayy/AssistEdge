@@ -4,3 +4,5 @@ opencv-python
 netifaces
 python-nmap
 pyttsx3
+paho-mqtt
+mediapipe

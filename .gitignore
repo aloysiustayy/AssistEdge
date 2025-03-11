@@ -1,5 +1,5 @@
 /SignLanguage/venv
+/SignLanguage/archive
 .DS_STORE
-/WebMQTT/flask_app/.webvenv/
+/SignLanguageTest/
 .*
-/SignLanguageTest/archive/

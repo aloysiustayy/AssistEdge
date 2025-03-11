@@ -1,17 +1,21 @@
+import cv2
+import numpy as np
+import tensorflow as tf
+import mediapipe as mp
+import mediapipe as mp
+import paho.mqtt.client as mqtt
+import time
 import netifaces
 import ipaddress
 import nmap
 import threading
-import cv2
-import numpy as np
-import tensorflow as tf
-import paho.mqtt.client as mqtt
-import time
+import queue
+import pyttsx3
 
 # =============================
-# Network Discovery Functions
+# Network Discovery Functions (Optional)
 # =============================
-def get_network_range(interface='wlan0'):
+def get_network_range(interface='en0'):
     try:
         addrs = netifaces.ifaddresses(interface)
         inet_info = addrs[netifaces.AF_INET][0]
@@ -39,7 +43,7 @@ def scan_network(network_range):
 def choose_broker_ip():
     network_range = get_network_range('en0')
     if not network_range:
-        print("Could not determine network range. Ensure 'wlan0' is active.")
+        print("Could not determine network range. Ensure 'en0' is active.")
         return None
     
     devices = scan_network(network_range)
@@ -65,102 +69,116 @@ def choose_broker_ip():
         return None
 
 # =============================
-# TensorFlow Lite Inference Setup
+# TFLite Model Setup
 # =============================
-MODEL_PATH = "best-fp16.tflite"
-
+MODEL_PATH = "sign_mnist_model_20epoch.tflite"
 interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
 interpreter.allocate_tensors()
+
+# Get input and output details.
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
-input_shape = input_details[0]['shape']
-input_height, input_width = input_shape[1], input_shape[2]
+input_shape = input_details[0]['shape']  # Expected: [1, 28, 28, 1]
+input_dtype = input_details[0]['dtype']
 
-def preprocess_frame(frame):
-    # Convert BGR to RGB
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    resized_frame = cv2.resize(frame_rgb, (input_width, input_height))
-    normalized_frame = resized_frame.astype(np.float32) / 255.0
-    input_data = np.expand_dims(normalized_frame, axis=0)
+print(f"Input DType: {input_dtype}")
+print("Quantization parameters:", input_details[0]['quantization'])
+
+# Define class names (adjust if your mapping is different)
+class_names = ["A", "B", "C", "D", "E",
+               "F", "G", "H", "I", "J",
+               "K", "L", "M", "N", "O",
+               "P", "Q", "R", "S", "T",
+               "U", "V", "W", "X", "Y"]
+
+# =============================
+# MediaPipe Hands Setup
+# =============================
+mp_hands = mp.solutions.hands
+hands_detector = mp_hands.Hands(static_image_mode=False,
+                                max_num_hands=1,
+                                min_detection_confidence=0.5)
+mp_draw = mp.solutions.drawing_utils
+
+# =============================
+# Preprocessing Function
+# =============================
+def preprocess(image):
+    """
+    Preprocess the input image to match the TFLite model's input:
+    - Convert to grayscale.
+    - Resize to 28x28.
+    - Expand dimensions to shape (1,28,28,1).
+    - Normalize to [0,1] if the model expects float input.
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    resized = cv2.resize(gray, (28, 28))
+    resized = np.expand_dims(resized, axis=-1)
+    input_data = np.expand_dims(resized, axis=0)
+    if input_dtype == np.float32:
+        input_data = input_data.astype(np.float32) / 255.0
+    else:
+        input_data = input_data.astype(input_dtype)
     return input_data
 
-def postprocess(predictions, conf_threshold=0.5, iou_threshold=0.5):
-    """
-    Convert raw YOLOv5 TFLite output to detections.
-    predictions: (num_predictions, 36) array.
-      - First 4 values: center_x, center_y, width, height (normalized to input size).
-      - 5th value: objectness score.
-      - Remaining 31 values: class scores.
-    Returns final boxes (x1, y1, x2, y2), confidences, and class_ids.
-    """
-    # Separate components
-    boxes = predictions[:, :4]       # [cx, cy, w, h]
-    objectness = predictions[:, 4:5]   # [objectness]
-    class_scores = predictions[:, 5:]  # [class scores]
+# =============================
+# TTS Worker Thread
+# =============================
+tts_queue = queue.Queue()
 
-    # Compute detection scores
-    scores = objectness * class_scores  # element-wise multiplication, shape (num, 31)
-    class_ids = np.argmax(scores, axis=1)
-    confidences = np.max(scores, axis=1)
-
-    # Filter by confidence threshold
-    mask = confidences >= conf_threshold
-    boxes = boxes[mask]
-    confidences = confidences[mask]
-    class_ids = class_ids[mask]
-
-    if boxes.shape[0] == 0:
-        return [], [], []
-
-    # Convert boxes from [cx, cy, w, h] to [x1, y1, x2, y2]
-    boxes_xyxy = np.zeros_like(boxes)
-    boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2  # x1
-    boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2  # y1
-    boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2  # x2
-    boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2  # y2
-
-    # Prepare boxes for NMS: convert to [x, y, w, h]
-    boxes_xywh = []
-    for b in boxes_xyxy:
-        x1, y1, x2, y2 = b
-        boxes_xywh.append([float(x1), float(y1), float(x2 - x1), float(y2 - y1)])
+def onEnd(name, completed):
+    if name == 'word':
+        engine.endLoop()
     
-    # Apply Non-Maximum Suppression using OpenCV
-    indices = cv2.dnn.NMSBoxes(boxes_xywh, confidences.tolist(), conf_threshold, iou_threshold)
-    if len(indices) > 0:
-        indices = indices.flatten()
-    else:
-        indices = []
+def tts_worker():
+    engine = pyttsx3.init()
+    engine.connect('finished-utterance', onEnd)
+    last_spoken_time = 0
+    cooldown = 2.0  # seconds between speeches
+    last_text = ""
+    while True:
 
-    final_boxes = boxes_xyxy[indices]
-    final_confidences = confidences[indices]
-    final_class_ids = class_ids[indices]
+        try:
+            text = tts_queue.get()
+            current_time = time.time()
+            if (current_time - last_spoken_time) > cooldown and text != last_text:
+                try:
+                    engine.say(str(text).lower(), 'word')
+                    engine.startLoop()
+                    print("Engine said: " + text)
+                except RuntimeError as e:
+                    if "run loop already started" in str(e):
+                        print("TTS engine run loop already started; skipping TTS for:", text)
+                    else:
+                        raise
+                last_spoken_time = current_time
+                last_text = text
+        except queue.Empty:
+            continue
 
-    return final_boxes, final_confidences, final_class_ids
-
-def run_inference(frame):
-    input_data = preprocess_frame(frame)
-    interpreter.set_tensor(input_details[0]['index'], input_data)
-    interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])
-    predictions = np.squeeze(output_data)  # Shape: (num_predictions, 36)
-    boxes, confs, class_ids = postprocess(predictions, conf_threshold=0.5, iou_threshold=0.5)
-    return boxes, confs, class_ids
 
 # =============================
-# Main Inference and MQTT Publishing
+# Main Function: Inference, MQTT, and TTS
 # =============================
 def main():
-    # Choose MQTT broker from network scan
+    # Start the TTS worker thread
+    tts_thread = threading.Thread(target=tts_worker, daemon=True)
+    tts_thread.start()
+
+    # Choose MQTT broker IP (or hardcode it, as shown below)
+    # Uncomment the following line to scan your network:
     chosen_ip = choose_broker_ip()
+    # chosen_ip = "172.20.10.8"  # Replace with your MQTT broker's IP if needed
     if not chosen_ip:
         print("No valid MQTT broker selected. Exiting.")
         return
 
-    MQTT_BROKER = chosen_ip  # Selected IP as broker
+    MQTT_BROKER = chosen_ip
     MQTT_PORT = 1883
     MQTT_TOPIC = "assistedge/sign_language"
 
+    # Setup MQTT client
+    # Setup MQTT client
     mqtt_client = mqtt.Client()
     try:
         mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
@@ -169,61 +187,111 @@ def main():
         return
     mqtt_client.loop_start()
 
+    # Initialize webcam
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Could not open webcam.")
-        return
+        exit()
 
-    # Define class labels (update as needed)
-    classes = ['N', 'a', 'b', 'c', 'ch', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'll', 
-               'm', 'n', 'o', 'otro', 'p', 'q', 'r', 'rr', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
-    prev_pred_class = ""
+    prev_predicted_index = -1
+    prev_sent_mqtt = "-"
+    streak_count = 0
+    min_streak = 10  # Number of consecutive frames required before confirming detection
 
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("Error: Failed to capture frame")
-                continue
+    # Define a penalty for specific classes (adjust as needed)
+    penalty_classes = {"Y": 0.2, "W": 0.2}
 
-            frame = cv2.flip(frame, 1)
-            # Run inference and get detections
-            boxes, confs, class_ids = run_inference(frame)
-            if len(boxes) > 0:
-                # Choose the detection with the highest confidence
-                max_idx = np.argmax(confs)
-                box = boxes[max_idx]
-                pred_index = class_ids[max_idx]
-                pred_class = classes[pred_index] if pred_index < len(classes) else "unknown"
-                confidence = confs[max_idx]
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Failed to capture frame")
+            break
 
-                # Draw bounding box and label
-                x1, y1, x2, y2 = map(int, box)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                label = f"{pred_class}: {confidence:.2f}"
-                cv2.putText(frame, label, (x1, max(y1 - 10, 20)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        frame = cv2.flip(frame, 1)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = hands_detector.process(frame_rgb)
 
-                # Publish to MQTT if confidence is high and prediction has changed
-                if confidence > 0.55 and pred_class != prev_pred_class:
-                    mqtt_client.publish(MQTT_TOPIC, pred_class)
-                    prev_pred_class = pred_class
-            else:
-                pred_class = "unknown"
-                cv2.putText(frame, pred_class, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                            1, (0, 0, 255), 2, cv2.LINE_AA)
-
-            cv2.imshow("Sign Language Recognition", frame)
+        roi = None
+        if results.multi_hand_landmarks:
+            hand_landmarks = results.multi_hand_landmarks[0]
+            img_h, img_w, _ = frame.shape
+            x_min, y_min = img_w, img_h
+            x_max, y_max = 0, 0
+            
+            for lm in hand_landmarks.landmark:
+                x, y = int(lm.x * img_w), int(lm.y * img_h)
+                x_min = min(x_min, x)
+                y_min = min(y_min, y)
+                x_max = max(x_max, x)
+                y_max = max(y_max, y)
+            
+            # Add a margin to the bounding box.
+            margin = 50
+            x_min = max(0, x_min - margin)
+            y_min = max(0, y_min - margin)
+            x_max = min(img_w, x_max + margin)
+            y_max = min(img_h, y_max + margin)
+            
+            cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+            roi = frame[y_min:y_max, x_min:x_max]
+        else:
+            # Reset if no hand is detected.
+            streak_count = 0
+            prev_predicted_index = -1
+            prev_sent_mqtt = "-"
+            cv2.putText(frame, "No hands detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                        1, (0, 255, 0), 2)
+            cv2.imshow("Sign Language Inference", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        print("Exiting...")
-    finally:
-        cap.release()
-        cv2.destroyAllWindows()
-        mqtt_client.loop_stop()
-        mqtt_client.disconnect()
+            continue
 
-if __name__ == "__main__":
-    main()
+        # Preprocess ROI and run inference.
+        input_data = preprocess(roi)
+        interpreter.set_tensor(input_details[0]['index'], input_data)
+        interpreter.invoke()
+        output_data = interpreter.get_tensor(output_details[0]['index'])
+        prediction = np.squeeze(output_data)
+        predicted_index = np.argmax(prediction)
+        confidence = prediction[predicted_index]
+
+        # Apply penalty if necessary.
+        current_sign = class_names[predicted_index]
+        if current_sign in penalty_classes:
+            confidence_adjusted = confidence - penalty_classes[current_sign]
+        else:
+            confidence_adjusted = confidence
+
+        threshold = 0.9
+        if confidence_adjusted > threshold:
+            print(f"Detected {current_sign}: {confidence_adjusted:.2f}")
+
+            # Update streak count.
+            if predicted_index == prev_predicted_index:
+                streak_count += 1
+            else:
+                streak_count = 1
+                prev_predicted_index = predicted_index
+
+            # Confirm detection after a number of consecutive frames.
+            if streak_count >= min_streak and current_sign != prev_sent_mqtt:
+                streak_count = 0
+                text = f"{current_sign}: {confidence_adjusted:.2f}"
+                cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                mqtt_client.publish(MQTT_TOPIC, current_sign)
+                tts_queue.put(current_sign)
+                prev_sent_mqtt = current_sign
+        else:
+            streak_count = 0
+            prev_predicted_index = -1
+            prev_sent_mqtt = "-"
+
+        cv2.imshow("Sign Language Inference", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+    tts_queue.join()
+
+main()
