@@ -2,3 +2,4 @@ opencv-python
 deepface
 requests
 tf_keras
+python-socketio[client]

@@ -1,28 +1,33 @@
 import React, { useEffect, useState } from "react";
+import socketIOClient from "socket.io-client";
+
+const SOCKET_SERVER_URL = "http://172.20.10.3:5001"; // Adjust if needed
 
 const VideoFeed = () => {
+  const [frame, setFrame] = useState(null);
   const [emotionCounts, setEmotionCounts] = useState({});
 
   useEffect(() => {
-    const fetchEmotionCounts = async () => {
-      try {
-        const response = await fetch("http://localhost:5001/emotion_counts");
-        const data = await response.json();
-        setEmotionCounts(data);
-      } catch (error) {
-        console.error("Error fetching emotion counts:", error);
-      }
-    };
-
-    const interval = setInterval(fetchEmotionCounts, 1000); // Fetch emotion counts every second
-    return () => clearInterval(interval);
+    const socket = socketIOClient(SOCKET_SERVER_URL);
+    socket.on("new_frame", (data) => {
+      setFrame(data.frame);
+      setEmotionCounts(data.emotion_counts || {});
+    });
+    return () => socket.disconnect();
   }, []);
 
   return (
     <div style={{ textAlign: "center", padding: "20px" }}>
       <h1>Real-time Emotion Detection</h1>
-
-      {/* Display emotion counts */}
+      {frame ? (
+        <img
+          src={`data:image/jpeg;base64,${frame}`}
+          alt="Live Video Stream"
+          style={{ width: "640px", borderRadius: "10px", border: "2px solid black" }}
+        />
+      ) : (
+        <p>Waiting for video stream...</p>
+      )}
       <h2>People's Emotions:</h2>
       <ul style={{ listStyle: "none", fontSize: "20px" }}>
         {Object.entries(emotionCounts).map(([emotion, count]) => (
@@ -31,13 +36,6 @@ const VideoFeed = () => {
           </li>
         ))}
       </ul>
-
-      {/* Video Stream */}
-      <img
-        src="http://localhost:5001/video_feed"
-        alt="Live Video Stream"
-        style={{ width: "640px", borderRadius: "10px", border: "2px solid black" }}
-      />
     </div>
   );
 };

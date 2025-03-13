@@ -1,13 +1,14 @@
 import threading
 import multiprocessing
 import asyncio
+import base64
+import cv2
+import numpy as np
 from hbmqtt.broker import Broker
 import paho.mqtt.client as mqtt
 from flask import Flask, jsonify, Response, request
 from flask_cors import CORS
-import base64
-import cv2
-import numpy as np
+from flask_socketio import SocketIO
 
 # ---------------------------
 # MQTT Broker (HBMQTT) Setup
@@ -53,16 +54,13 @@ data_store = {
 # ---------------------------
 # MQTT Client (paho-mqtt) Setup
 # ---------------------------
-# Use localhost since the broker runs in the same machine (in a separate process).
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 TOPIC_SIGN = "assistedge/sign_language"
-TOPIC_EMOTION = "assistedge/emotion"
 
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT broker with result code", rc)
     client.subscribe(TOPIC_SIGN)
-    client.subscribe(TOPIC_EMOTION)
 
 def on_message(client, userdata, msg):
     topic = msg.topic
@@ -72,10 +70,7 @@ def on_message(client, userdata, msg):
         data_store["sign_language"].append(payload)
         if len(data_store["sign_language"]) > 100:
             data_store["sign_language"] = data_store["sign_language"][-100:]
-    elif topic == TOPIC_EMOTION:
-        data_store["emotion"].append(payload)
-        if len(data_store["emotion"]) > 100:
-            data_store["emotion"] = data_store["emotion"][-100:]
+   
 
 def mqtt_client_thread():
     client = mqtt.Client()
@@ -89,17 +84,22 @@ def mqtt_client_thread():
     client.loop_forever()
 
 # ---------------------------
-# Flask Webserver Setup
+# Flask & SocketIO Webserver Setup
 # ---------------------------
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Global variables to hold the latest frame and emotion counts
 latest_frame = None
-latest_emotion_counts = {}  # Stores count of each emotion
+latest_emotion_counts = {}
 
 @app.route('/upload_frame', methods=['POST'])
 def upload_frame():
-    """Receives video frames & emotion counts from Raspberry Pi."""
+    """
+    Receives video frames & emotion counts from Raspberry Pi,
+    updates the global variables, and broadcasts them via SocketIO.
+    """
     global latest_frame, latest_emotion_counts
     try:
         data = request.json
@@ -107,58 +107,74 @@ def upload_frame():
         latest_emotion_counts = data.get("emotion_counts", {})
 
         if frame_base64:
+            # Decode and update the latest frame
             img_bytes = base64.b64decode(frame_base64)
             img_array = np.frombuffer(img_bytes, dtype=np.uint8)
             latest_frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
+            # Broadcast the frame and emotion counts to all SocketIO clients
+            socketio.emit('new_frame', {'frame': frame_base64, 'emotion_counts': latest_emotion_counts})
         return "Frame received", 200
     except Exception as e:
         return f"Error: {e}", 500
 
 @app.route('/video_feed')
 def video_feed():
-    """Serves video stream to React."""
+    """
+    Serves a video stream by yielding JPEG-encoded frames.
+    """
     def generate():
         while True:
             if latest_frame is not None:
-                _, buffer = cv2.imencode('.jpg', latest_frame)
+                ret, buffer = cv2.imencode('.jpg', latest_frame)
+                if not ret:
+                    continue
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-    
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/emotion_counts')
 def get_emotion_counts():
-    """Sends the latest emotion count data to React."""
-    return latest_emotion_counts, 200
-
-@app.route('/')
-def index():
-    return "MQTT Flask Server Running. Visit /data to see the latest messages."
+    """Returns the latest emotion counts as JSON."""
+    return jsonify(latest_emotion_counts), 200
 
 @app.route('/data')
 def get_data():
+    """Returns the latest MQTT messages data."""
     return jsonify(data_store)
 
 @app.route('/sign-language')
 def get_translated_sign():
+    """Returns the latest sign language messages."""
     return jsonify({'sign_language': data_store["sign_language"]})
 
+@socketio.on('connect')
+def handle_connect():
+    print('SocketIO client connected.')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('SocketIO client disconnected.')
+
+@socketio.on('frame')
+def handle_frame(data):
+    # Optionally re-emit the frame data if needed
+    socketio.emit('new_frame', data)
+
 # ---------------------------
-# Main: Start Broker (in separate process), MQTT Client (in thread), and Flask App
+# Main: Start Broker, MQTT Client, and Flask/SocketIO Server
 # ---------------------------
 if __name__ == '__main__':
     # Start the MQTT broker in a separate process.
-    # broker_process = multiprocessing.Process(target=run_broker, daemon=True)
-    # broker_process.start()
-    # print("Broker process started.")
+    broker_process = multiprocessing.Process(target=run_broker, daemon=True)
+    broker_process.start()
+    print("MQTT Broker process started.")
 
     # Start the MQTT client in a separate thread.
     client_thread = threading.Thread(target=mqtt_client_thread, daemon=True)
     client_thread.start()
 
-    # Run the Flask webserver (listening on port 5001).
-    app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
+    # Run the Flask app with SocketIO.
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False)
 
-    # When the Flask app terminates, you might want to terminate the broker process.
+    # If the Flask app terminates, clean up the broker process.
     broker_process.terminate()
