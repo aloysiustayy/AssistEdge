@@ -11,6 +11,18 @@ import nmap
 import threading
 import queue
 import pyttsx3
+import argparse
+import sys
+import subprocess
+import platform
+
+# ----------------------------
+# Parse command-line arguments
+# ----------------------------
+parser = argparse.ArgumentParser(description='Real-time Sign Language Inference with TTS and MQTT.')
+parser.add_argument('--headless', action='store_true', help='Run without OpenCV GUI windows')
+args = parser.parse_args()
+headless = args.headless
 
 # =============================
 # Network Discovery Functions (Optional)
@@ -126,6 +138,18 @@ def preprocess(image):
 # =============================
 tts_queue = queue.Queue()
 
+def speak_text(text):
+    # Check if we're on an ARM architecture (common on Raspberry Pi)
+    if "arm" in platform.machine().lower():
+        # Use espeak-ng via subprocess on Raspberry Pi
+        subprocess.run(["espeak-ng", text.lower()])
+    else:
+        # Use pyttsx3 on desktop/laptop (x86 systems)
+        engine = pyttsx3.init()
+        engine.say(text)
+        engine.runAndWait()
+
+
 def onEnd(name, completed):
     if name == 'word':
         engine.endLoop()
@@ -143,9 +167,19 @@ def tts_worker():
             current_time = time.time()
             if (current_time - last_spoken_time) > cooldown and text != last_text:
                 try:
-                    engine.say(str(text).lower(), 'word')
-                    engine.startLoop()
-                    print("Engine said: " + text)
+                    print("Engine saying: " + text)
+                    print("Platform: "+ platform.machine().lower())
+                    
+                    if "aarch64" in platform.machine().lower():
+                        # Use espeak-ng via subprocess on Raspberry Pi
+                        subprocess.run(["espeak-ng", text.lower()])
+                    else:
+                        engine.say(str(text).lower(), 'word')
+                        engine.startLoop()
+                        time.sleep(2)
+                        if headless and engine._inLoop:
+                            engine.endLoop()
+                            print("Loop ended!!")
                 except RuntimeError as e:
                     if "run loop already started" in str(e):
                         print("TTS engine run loop already started; skipping TTS for:", text)
@@ -155,7 +189,9 @@ def tts_worker():
                 last_text = text
         except queue.Empty:
             continue
-
+    if headless and engine._inLoop:
+        engine.endLoop()
+        print("Loop ended!!")
 
 # =============================
 # Main Function: Inference, MQTT, and TTS
@@ -188,6 +224,7 @@ def main():
     mqtt_client.loop_start()
 
     # Initialize webcam
+
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Could not open webcam.")
@@ -239,11 +276,12 @@ def main():
             streak_count = 0
             prev_predicted_index = -1
             prev_sent_mqtt = "-"
-            cv2.putText(frame, "No hands detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                        1, (0, 255, 0), 2)
-            cv2.imshow("Sign Language Inference", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            if not headless:
+                cv2.putText(frame, "No hands detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                            1, (0, 255, 0), 2)
+                cv2.imshow("Sign Language Inference", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
             continue
 
         # Preprocess ROI and run inference.
@@ -277,7 +315,8 @@ def main():
             if streak_count >= min_streak and current_sign != prev_sent_mqtt:
                 streak_count = 0
                 text = f"{current_sign}: {confidence_adjusted:.2f}"
-                cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                if not headless:
+                    cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 mqtt_client.publish(MQTT_TOPIC, current_sign)
                 tts_queue.put(current_sign)
                 prev_sent_mqtt = current_sign
@@ -286,9 +325,11 @@ def main():
             prev_predicted_index = -1
             prev_sent_mqtt = "-"
 
-        cv2.imshow("Sign Language Inference", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        if not headless:
+            cv2.imshow("Sign Language Inference", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
 
     cap.release()
     cv2.destroyAllWindows()

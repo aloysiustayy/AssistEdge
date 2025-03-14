@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import socketIOClient from "socket.io-client";
 
-const SOCKET_SERVER_URL = "http://172.20.10.3:5001"; // Adjust if needed
+const SOCKET_SERVER_URL = "http://localhost:5001"; // Adjust if needed
 
 const VideoFeed = () => {
   const [frame, setFrame] = useState(null);

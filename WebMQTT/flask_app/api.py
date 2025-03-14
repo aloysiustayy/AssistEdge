@@ -48,7 +48,6 @@ def run_broker():
 # ---------------------------
 data_store = {
     "sign_language": [],  # Data from sign language Raspberry Pi
-    "emotion": []         # Data from emotion Raspberry Pi
 }
 
 # ---------------------------
@@ -146,6 +145,12 @@ def get_data():
 def get_translated_sign():
     """Returns the latest sign language messages."""
     return jsonify({'sign_language': data_store["sign_language"]})
+
+@app.route('/clear', methods=['POST'])
+def clear_sign_language():
+    data_store["sign_language"].clear()
+    return jsonify({"status": "success", "message": "Sign language data cleared"})
+
 
 @socketio.on('connect')
 def handle_connect():
