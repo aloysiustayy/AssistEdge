@@ -5,17 +5,20 @@ import argparse
 import time
 from deepface import DeepFace
 
-# Connect to the Flask-SocketIO server
-sio = socketio.Client()
-FLASK_SERVER_URL = "http://172.20.10.3:5001" #"http://192.168.18.20:5001"  # Replace with your server's IP if needed
-sio.connect(FLASK_SERVER_URL)
+
 
 parser = argparse.ArgumentParser(description="Run emotion detection with optional GUI")
 parser.add_argument("--headless", action="store_true", help="Disable GUI display")
 parser.add_argument("--check", type=int, default=1, help="Run DeepFace analysis every N frames (default: every frame)")
 parser.add_argument("--fps", type=int, default=10, help="Set the target FPS for stable performance (default: 10)")
+parser.add_argument("--ip", type=str, default="172.20.10.3", help="Flask Server IP address")
 args = parser.parse_args()
 
+# Connect to the Flask-SocketIO server
+sio = socketio.Client()
+FLASK_SERVER_URL = f"http://{args.ip}:5001" #"http://192.168.18.20:5001"  # Replace with your server's IP if needed
+sio.connect(FLASK_SERVER_URL)
+print(f"Connecting to FLASK_SERVER_URL at {FLASK_SERVER_URL}")
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 cap = cv2.VideoCapture(0)
 
@@ -25,10 +28,12 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 
 frame_counter = 0
 emotion = "unknown"
+
 target_frame_time = 1.0 / args.fps  # Convert FPS to frame time in seconds
 last_frame_time = time.monotonic()  # Initialize the time tracker
 
 while True:
+    all_emotions = {}
     current_time = time.monotonic()
     elapsed_time = current_time - last_frame_time
 
@@ -56,6 +61,10 @@ while True:
                 result = DeepFace.analyze(face_roi, actions=['emotion'], enforce_detection=False)
                 if result and isinstance(result, list):
                     emotion = result[0].get('dominant_emotion', 'unknown')
+                    if emotion not in all_emotions:
+                        all_emotions[emotion] = 1
+                    else:
+                        all_emotions[emotion] += 1
             except Exception as e:
                 print(f"Error analyzing emotion: {e}")
                 emotion = "error"
@@ -70,7 +79,8 @@ while True:
     frame_base64 = base64.b64encode(buffer).decode("utf-8")
 
     # Emit the frame and emotion via WebSocket
-    sio.emit('frame', {"frame": frame_base64, "emotion": emotion})
+    # sio.emit('frame', {"frame": frame_base64, "emotion": emotion})
+    sio.emit('frame', {"frame": frame_base64, "all_emotion": all_emotions})
 
     # Optionally display the frame locally if not in headless mode
     if not args.headless:

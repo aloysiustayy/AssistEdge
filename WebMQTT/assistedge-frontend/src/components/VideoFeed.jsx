@@ -11,7 +11,10 @@ const VideoFeed = () => {
     const socket = socketIOClient(SOCKET_SERVER_URL);
     socket.on("new_frame", (data) => {
       setFrame(data.frame);
-      setEmotionCounts(data.emotion_counts || {});
+      // console.log(data)
+      console.log(emotionCounts)
+      setEmotionCounts(data.all_emotion || {});
+
     });
     return () => socket.disconnect();
   }, []);
