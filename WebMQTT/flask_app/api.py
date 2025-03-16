@@ -9,6 +9,89 @@ import paho.mqtt.client as mqtt
 from flask import Flask, jsonify, Response, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
+import csv
+import time
+import psutil
+from datetime import datetime
+import json
+
+# ---------------------------
+# Global Data Storage
+# ---------------------------
+combined_data_store = {}  # Stores data from both MQTT and SocketIO before saving
+csv_filename = "combined_data.csv"
+last_appended_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def is_within_time_difference(timestamp1, timestamp2, x):
+    """
+    Check if the difference between two timestamps is less than x seconds.
+
+    :param timestamp1: First timestamp (string in '%Y-%m-%d %H:%M:%S' format)
+    :param timestamp2: Second timestamp (string in '%Y-%m-%d %H:%M:%S' format)
+    :param x: Time difference threshold in seconds (integer)
+    :return: True if the difference is less than x seconds, False otherwise
+    """
+    time1 = datetime.strptime(timestamp1, '%Y-%m-%d %H:%M:%S')
+    time2 = datetime.strptime(timestamp2, '%Y-%m-%d %H:%M:%S')
+    # print(f"Time diff between {time2} and {time1} is {abs((time2 - time1).total_seconds())}")
+    return abs((time2 - time1).total_seconds()) < x
+    
+# ---------------------------
+# Save Merged Data to CSV
+# ---------------------------
+
+def save_to_csv():
+    """ Check for complete data pairs and save them to CSV. """
+    global combined_data_store
+
+    with open(csv_filename, "a", newline="") as file:
+        writer = csv.writer(file)
+
+        # Write header only if file is empty
+        if file.tell() == 0:
+            writer.writerow([
+                "cur_time", "recognised_word", "recognised_emotion", 
+                "recognised_speech", "cpu_usage", 
+                "correlation_with_emotion", "frequent_pairs"
+            ])
+
+        for timestamp, data in list(combined_data_store.items()):
+            if "recognised_word" in data and "recognised_emotion" in data:
+                writer.writerow([
+                    timestamp, 
+                    data.get("recognised_word", "N/A"), 
+                    data.get("recognised_emotion", "N/A"),
+                    data.get("recognised_speech", "N/A"),
+                    get_cpu_usage(),
+                    data.get("correlation_with_emotion", "N/A"),
+                    data.get("frequent_pairs", "N/A")
+                ])
+
+def update_csv(emotion_ts, all_emotions):
+    #   flow
+    #   1. detects sign language
+    #   2. for the next 3 seconds, add any emotions detected to the same row
+
+    global last_appended_timestamp
+    if last_appended_timestamp in combined_data_store:
+        if "recognised_emotion" not in combined_data_store[last_appended_timestamp]:
+            if is_within_time_difference(last_appended_timestamp, emotion_ts, 3) and last_appended_timestamp != "":
+                # print("is within time diff!!")
+
+                combined_data_store[last_appended_timestamp].update({
+                    "recognised_emotion": all_emotions
+                })
+                print(combined_data_store)
+
+                save_to_csv()
+                print(f"Saving {combined_data_store[last_appended_timestamp]}!")
+
+
+# ---------------------------
+# Function to Get CPU Usage
+# ---------------------------
+def get_cpu_usage():
+    return psutil.cpu_percent(interval=1)
 
 # ---------------------------
 # MQTT Broker (HBMQTT) Setup
@@ -62,14 +145,36 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(TOPIC_SIGN)
 
 def on_message(client, userdata, msg):
-    topic = msg.topic
-    payload = msg.payload.decode()
-    print(f"Received message on {topic}: {payload}")
-    if topic == TOPIC_SIGN:
-        data_store["sign_language"].append(payload)
-        if len(data_store["sign_language"]) > 100:
-            data_store["sign_language"] = data_store["sign_language"][-100:]
+    # topic = msg.topic
+    # payload = msg.payload.decode()
+    # print(f"Received message on {topic}: {payload}")
+    # if topic == TOPIC_SIGN:
+        # data_store["sign_language"].append(payload)
+        # if len(data_store["sign_language"]) > 100:
+        #     data_store["sign_language"] = data_store["sign_language"][-100:]
    
+    # new
+    global last_appended_timestamp
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    payload = msg.payload.decode()
+
+    print(f"[MQTT] Received Word: {payload}")
+
+    # Store data in shared dictionary
+    if timestamp not in combined_data_store:
+        combined_data_store[timestamp] = {}
+    combined_data_store[timestamp].update({
+        "recognised_word": payload
+    })
+
+    # assign current timestamp to global timestamp for easy reference in other processes and methods
+    last_appended_timestamp = timestamp
+
+    # working version of displaying data in react
+    data_store["sign_language"].append(payload)
+    if len(data_store["sign_language"]) > 100:
+        data_store["sign_language"] = data_store["sign_language"][-100:]
+
 
 def mqtt_client_thread():
     client = mqtt.Client()
@@ -152,6 +257,11 @@ def clear_sign_language():
     return jsonify({"status": "success", "message": "Sign language data cleared"})
 
 
+@app.route('/dashboard')
+def get_dashboard():
+    global combined_data_store
+    return jsonify(combined_data_store)
+    
 @socketio.on('connect')
 def handle_connect():
     print('SocketIO client connected.')
@@ -164,6 +274,14 @@ def handle_disconnect():
 def handle_frame(data):
     # Optionally re-emit the frame data if needed
     socketio.emit('new_frame', data)
+
+    """Handles data from Raspberry Pi (Emotion Recognition & Speech-to-Text)."""
+    global combined_data_store
+
+    recognised_emotion = data.get("all_emotion", "N/A")
+    if recognised_emotion != {}:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        update_csv(timestamp,recognised_emotion)
 
 # ---------------------------
 # Main: Start Broker, MQTT Client, and Flask/SocketIO Server
@@ -183,3 +301,4 @@ if __name__ == '__main__':
 
     # If the Flask app terminates, clean up the broker process.
     broker_process.terminate()
+

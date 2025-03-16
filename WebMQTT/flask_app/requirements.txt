@@ -6,3 +6,4 @@ websockets==8.1
 Werkzeug==2.2.2
 opencv-python
 flask-socketio
+psutil

@@ -17,8 +17,23 @@ args = parser.parse_args()
 # Connect to the Flask-SocketIO server
 sio = socketio.Client()
 FLASK_SERVER_URL = f"http://{args.ip}:5001" #"http://192.168.18.20:5001"  # Replace with your server's IP if needed
-sio.connect(FLASK_SERVER_URL)
+
+@sio.event
+def connect():
+    print("Successfully connected to Flask-SocketIO server.")
+
+@sio.event
+def connect_error(data):
+    print("Failed to connect to Flask-SocketIO server.")
+
+@sio.event
+def disconnect():
+    print("Disconnected from Flask-SocketIO server.")
+
+sio.connect(FLASK_SERVER_URL, namespaces=["/"])
 print(f"Connecting to FLASK_SERVER_URL at {FLASK_SERVER_URL}")
+
+
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 cap = cv2.VideoCapture(0)
 
@@ -80,8 +95,11 @@ while True:
 
     # Emit the frame and emotion via WebSocket
     # sio.emit('frame', {"frame": frame_base64, "emotion": emotion})
-    sio.emit('frame', {"frame": frame_base64, "all_emotion": all_emotions})
-
+    
+    if sio.connected:
+        sio.emit('frame', {"frame": frame_base64, "all_emotion": all_emotions}, namespace="/")
+    else:
+        print("SocketIO not connected, skipping emit.")
     # Optionally display the frame locally if not in headless mode
     if not args.headless:
         cv2.imshow('Emotion Detection', frame)

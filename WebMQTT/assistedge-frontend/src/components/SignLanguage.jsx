@@ -8,8 +8,10 @@ const SignLanguagePage = () => {
     const fetchMessages = async () => {
       try {
         const response = await fetch("http://localhost:5001/data");
+
         if (response.ok) {
           const data = await response.json();
+          console.log(data);
           setMessages(data.sign_language || []);
         } else {
           console.error("Failed to fetch messages. Status:", response.status);
