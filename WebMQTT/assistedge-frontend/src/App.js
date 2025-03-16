@@ -12,7 +12,7 @@ function App() {
       <div className="app-container">
         {/* Navigation Bar */}
         <nav className="navbar">
-          <h2 className="logo">Assistive Edge</h2>
+          <h2 className="logo">AssistEdge</h2>
           <ul className="nav-links">
             <li><Link to="/sign">Sign Language</Link></li>
             <li><Link to="/video">Video Feed</Link></li>

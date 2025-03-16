@@ -14,7 +14,8 @@ import time
 import psutil
 from datetime import datetime
 import json
-
+from flask import Flask, Response
+import os
 # ---------------------------
 # Global Data Storage
 # ---------------------------
@@ -261,7 +262,27 @@ def clear_sign_language():
 def get_dashboard():
     global combined_data_store
     return jsonify(combined_data_store)
+
+# Serve the CSV file
+@app.route('/csv')
+def get_csv():
+    csv_path = "combined_data.csv"
     
+    # Check if the file exists
+    if not os.path.exists(csv_path):
+        return f"File not found: {csv_path}", 404
+    
+    # Read the CSV file into memory
+    with open(csv_path, 'r') as file:
+        csv_data = file.read()
+    
+    # Return the CSV data as a response
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=combined_data.csv"}
+    )
+
 @socketio.on('connect')
 def handle_connect():
     print('SocketIO client connected.')
