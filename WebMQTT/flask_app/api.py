@@ -132,6 +132,7 @@ def run_broker():
 # ---------------------------
 data_store = {
     "sign_language": [],  # Data from sign language Raspberry Pi
+    "speech": [],
 }
 
 # ---------------------------
@@ -140,41 +141,49 @@ data_store = {
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 TOPIC_SIGN = "assistedge/sign_language"
+TOPIC_SPEECH = "assistedge/speech"
 
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT broker with result code", rc)
     client.subscribe(TOPIC_SIGN)
+    client.subscribe(TOPIC_SPEECH)
 
 def on_message(client, userdata, msg):
-    # topic = msg.topic
+    topic = msg.topic
     # payload = msg.payload.decode()
     # print(f"Received message on {topic}: {payload}")
-    # if topic == TOPIC_SIGN:
-        # data_store["sign_language"].append(payload)
-        # if len(data_store["sign_language"]) > 100:
-        #     data_store["sign_language"] = data_store["sign_language"][-100:]
-   
-    # new
-    global last_appended_timestamp
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    payload = msg.payload.decode()
+    if topic == TOPIC_SIGN:
+        # new
+        global last_appended_timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        payload = msg.payload.decode()
 
-    print(f"[MQTT] Received Word: {payload}")
+        print(f"[MQTT] Received Word: {payload}")
 
-    # Store data in shared dictionary
-    if timestamp not in combined_data_store:
-        combined_data_store[timestamp] = {}
-    combined_data_store[timestamp].update({
-        "recognised_word": payload
-    })
+        # Store data in shared dictionary
+        if timestamp not in combined_data_store:
+            combined_data_store[timestamp] = {}
+        combined_data_store[timestamp].update({
+            "recognised_word": payload
+        })
 
-    # assign current timestamp to global timestamp for easy reference in other processes and methods
-    last_appended_timestamp = timestamp
+        # assign current timestamp to global timestamp for easy reference in other processes and methods
+        last_appended_timestamp = timestamp
 
-    # working version of displaying data in react
-    data_store["sign_language"].append(payload)
-    if len(data_store["sign_language"]) > 100:
-        data_store["sign_language"] = data_store["sign_language"][-100:]
+        # working version of displaying data in react
+        data_store["sign_language"].append(payload)
+        if len(data_store["sign_language"]) > 100:
+            data_store["sign_language"] = data_store["sign_language"][-100:]
+            
+    else:
+        payload = msg.payload.decode()
+
+        print(f"[MQTT] Received Word: {payload}")
+
+        data_store["speech"].append(payload)
+        if len(data_store["speech"]) > 100:
+            data_store["speech"] = data_store["speech"][-100:]
+    
 
 
 def mqtt_client_thread():

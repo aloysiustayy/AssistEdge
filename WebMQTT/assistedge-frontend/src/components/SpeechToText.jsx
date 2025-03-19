@@ -1,39 +1,68 @@
 import React, { useEffect, useState } from "react";
-import socketIOClient from "socket.io-client";
 
-const SOCKET_SERVER_URL = "http://localhost:5001"; // Adjust if needed
-
-const SpeechToText = () => {
-  const [frame, setFrame] = useState(null);
-  const [emotionCounts, setEmotionCounts] = useState({});
+const SignLanguagePage = () => {
+  const [messages, setMessages] = useState([]);
 
   useEffect(() => {
-    const socket = socketIOClient(SOCKET_SERVER_URL);
-    socket.on("new_frame", (data) => {
-      setFrame(data.frame);
-      // console.log(data)
-      console.log(emotionCounts)
-      setEmotionCounts(data.all_emotion || {});
 
-    });
-    return () => socket.disconnect();
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch("http://localhost:5001/data");
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(data);
+          setMessages(data.speech || []);
+        } else {
+          console.error("Failed to fetch messages. Status:", response.status);
+        }
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
+
+    // fetchMessages();
+    const intervalId = setInterval(fetchMessages, 1000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
+  const clearMessages = async () => {
+    try {
+      const response = await fetch("http://localhost:5001/clear", {
+        method: "POST",
+      });
+      if (response.ok) {
+        setMessages([]); // Also clear client state
+      } else {
+        console.error("Failed to clear messages. Status:", response.status);
+      }
+    } catch (error) {
+      console.error("Error clearing messages:", error);
+    }
+  };
+
   return (
-    <div style={{ textAlign: "center", padding: "20px" }}>
-      <h1>Speech To Text</h1>
-      {frame ? (
-        <img
-          src={`data:image/jpeg;base64,${frame}`}
-          alt="Live Video Stream"
-          style={{ width: "640px", borderRadius: "10px", border: "2px solid black" }}
-        />
-      ) : (
-        <p>Waiting for video stream...</p>
-      )}
-     
+    <div>
+      <h2>Sign Language to Text</h2>
+      <div
+        style={{
+          border: "1px solid #ccc",
+          height: "300px",
+          overflowY: "scroll",
+          padding: "10px",
+          backgroundColor: "#f9f9f9",
+        }}
+      >
+        {messages.map((msg, index) => (
+          <p key={index} style={{ margin: "5px 0" }}>
+            {msg}
+          </p>
+        ))}
+      </div>
+      <button onClick={clearMessages}>Clear Messages</button>
     </div>
   );
 };
 
-export default SpeechToText;
+export default SignLanguagePage;
