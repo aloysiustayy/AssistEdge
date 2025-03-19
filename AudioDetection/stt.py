@@ -76,15 +76,11 @@ def main():
                 audio_data = np.frombuffer(audio.get_raw_data(), np.int16).astype(np.float32) / 32768.0
                 sampling_rate = audio.sample_rate
 
-                google_text = recognizer.recognize_google(audio)
-
                 try:
                     predicted_word = recognize_speech_from_audio_data(audio_data, sampling_rate)
                     print(f"AssistEdge Predicted Word: {predicted_word}")
 
                     process_transcription(predicted_word)
-
-                    print(f"Google Predicted: {google_text}")
 
                 except Exception as e:
                     print(f"Could not process the speech; {e}")
