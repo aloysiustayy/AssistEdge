@@ -21,6 +21,7 @@ import platform
 # ----------------------------
 parser = argparse.ArgumentParser(description='Real-time Sign Language Inference with TTS and MQTT.')
 parser.add_argument('--headless', action='store_true', help='Run without OpenCV GUI windows')
+parser.add_argument("--ip", type=str, default="192.168.1.100", help="Flask Server IP address")
 args = parser.parse_args()
 headless = args.headless
 
@@ -55,7 +56,7 @@ def scan_network(network_range):
 def choose_broker_ip():
     network_range = get_network_range('en0')
     if not network_range:
-        print("Could not determine network range. Ensure 'en0' is active.")
+        print("Could not determine network range. Ensure 'en0' or 'wlan0 is active.")
         return None
     
     devices = scan_network(network_range)
@@ -201,19 +202,20 @@ def main():
     tts_thread = threading.Thread(target=tts_worker, daemon=True)
     tts_thread.start()
 
-    # Choose MQTT broker IP (or hardcode it, as shown below)
-    # Uncomment the following line to scan your network:
-    chosen_ip = choose_broker_ip()
-    # chosen_ip = "172.20.10.8"  # Replace with your MQTT broker's IP if needed
-    if not chosen_ip:
-        print("No valid MQTT broker selected. Exiting.")
-        return
-
-    MQTT_BROKER = chosen_ip
+    
+    # Choose MQTT broker IP
+    MQTT_BROKER = "192.168.1.100"
+    if args.ip:
+        MQTT_BROKER = choose_broker_ip()
+    else:
+        chosen_ip = choose_broker_ip()
+        if not chosen_ip:
+            print("No valid MQTT broker selected. Exiting.")
+            return
+    
     MQTT_PORT = 1883
     MQTT_TOPIC = "assistedge/sign_language"
 
-    # Setup MQTT client
     # Setup MQTT client
     mqtt_client = mqtt.Client()
     try:
@@ -224,7 +226,6 @@ def main():
     mqtt_client.loop_start()
 
     # Initialize webcam
-
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Could not open webcam.")
@@ -235,8 +236,8 @@ def main():
     streak_count = 0
     min_streak = 10  # Number of consecutive frames required before confirming detection
 
-    # Define a penalty for specific classes (adjust as needed)
-    penalty_classes = {"Y": 0.2, "W": 0.2}
+    # Penalty for specific classes because it keeps appearing even for other signs
+    penalty_classes = {"W": 0.2, "F": 0.2}
 
     while True:
         ret, frame = cap.read()

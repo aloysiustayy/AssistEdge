@@ -16,7 +16,7 @@ args = parser.parse_args()
 
 # Connect to the Flask-SocketIO server
 sio = socketio.Client()
-FLASK_SERVER_URL = f"http://{args.ip}:5001" #"http://192.168.18.20:5001"  # Replace with your server's IP if needed
+FLASK_SERVER_URL = f"http://{args.ip}:5001"
 
 @sio.event
 def connect_error(data):
@@ -33,7 +33,6 @@ def connect():
 
 sio.connect(FLASK_SERVER_URL, namespaces=["/"])
 print(f"Connecting to FLASK_SERVER_URL at {FLASK_SERVER_URL}")
-
 
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 cap = cv2.VideoCapture(0)

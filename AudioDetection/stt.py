@@ -3,6 +3,11 @@ import numpy as np
 import joblib
 import librosa
 import paho.mqtt.client as mqtt
+import argparse
+
+parser = argparse.ArgumentParser(description="Run emotion detection with optional GUI")
+parser.add_argument("--ip", type=str, default="192.168.1.100", help="Flask Server IP address")
+args = parser.parse_args()
 
 # Load the trained MFCC model and scaler
 model = joblib.load('speech_recognition_model.pkl')
@@ -43,6 +48,9 @@ def process_transcription(text):
 def main():
 
     MQTT_BROKER = "192.168.1.100"
+    if args.ip:
+        MQTT_BROKER = args.ip
+    
     MQTT_PORT = 1883
     MQTT_TOPIC = "assistedge/speech"
 
@@ -56,6 +64,7 @@ def main():
         return
     mqtt_client.loop_start()
 
+    # This mic name is hard-coded, if using other mic, need to find out microphone name
     mic_name = "JOYACCESS: USB Audio"
     
     mic_index = find_microphone(mic_name)

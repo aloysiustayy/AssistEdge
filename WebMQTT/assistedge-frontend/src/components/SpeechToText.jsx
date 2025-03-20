@@ -7,7 +7,7 @@ const SignLanguagePage = () => {
 
     const fetchMessages = async () => {
       try {
-        const response = await fetch("http://localhost:5001/data");
+        const response = await fetch("http://192.168.1.100:5001/data");
 
         if (response.ok) {
           const data = await response.json();
@@ -29,7 +29,7 @@ const SignLanguagePage = () => {
 
   const clearMessages = async () => {
     try {
-      const response = await fetch("http://localhost:5001/clear", {
+      const response = await fetch("http://192.168.1.100:5001/clear", {
         method: "POST",
       });
       if (response.ok) {
