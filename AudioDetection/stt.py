@@ -1,8 +1,8 @@
 import speech_recognition as sr
-import whisper
 import numpy as np
 import joblib
 import librosa
+import paho.mqtt.client as mqtt
 
 # Load the trained MFCC model and scaler
 model = joblib.load('speech_recognition_model.pkl')
@@ -21,18 +21,6 @@ def recognize_speech_from_audio_data(audio_data, sampling_rate):
     mfcc_scaled = scaler.transform([mfccs])
     prediction = model.predict(mfcc_scaled)
     return prediction[0]
-
-class WhisperRecognizer:
-    def __init__(self, model_size="base"):
-        self.model = whisper.load_model(model_size)
-        
-    def recognize(self, audio_data):
-        # Convert the audio data to a NumPy array
-        audio = np.frombuffer(audio_data.get_raw_data(), np.int16).astype(np.float32) / 32768.0
-        sr = audio.sample_rate
-        # Use Whisper to transcribe the audio
-        result = self.model.transcribe(audio, fp16=False)
-        return result["text"]
 
 def find_microphone(mic_name):
     """Find a microphone by name."""
@@ -53,6 +41,21 @@ def process_transcription(text):
     print(f"Processed transcription: {text}")
 
 def main():
+
+    MQTT_BROKER = "192.168.1.100"
+    MQTT_PORT = 1883
+    MQTT_TOPIC = "assistedge/speech"
+
+
+    # Setup MQTT client
+    mqtt_client = mqtt.Client()
+    try:
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    except Exception as e:
+        print("Error connecting to MQTT broker:", e)
+        return
+    mqtt_client.loop_start()
+
     mic_name = "JOYACCESS: USB Audio"
     
     mic_index = find_microphone(mic_name)
@@ -63,7 +66,6 @@ def main():
     try:
         mic = sr.Microphone(device_index=mic_index)
         recognizer = sr.Recognizer()
-        whisper_recognizer = WhisperRecognizer(model_size="base")
 
         print("\nListening... Press Ctrl+C to stop.")
 
@@ -81,6 +83,7 @@ def main():
                     print(f"AssistEdge Predicted Word: {predicted_word}")
 
                     process_transcription(predicted_word)
+                    mqtt_client.publish(MQTT_TOPIC, predicted_word)
 
                 except Exception as e:
                     print(f"Could not process the speech; {e}")
