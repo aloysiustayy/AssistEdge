@@ -41,7 +41,7 @@ const AboutPage = () => {
             Converts spoken language to text instantly, making conversations more accessible.
           </p>
 
-          <h3 style={{ color: "#555", marginBottom: "5px" }}>😊 Emotion Recognizer</h3>
+          <h3 style={{ color: "#555", marginBottom: "5px" }}>😊 Emotion Recogniser</h3>
           <p style={{ fontSize: "16px", lineHeight: "1.6", color: "#666" }}>
             Detects emotions from a video feed, providing real-time emotional insights.
           </p>
