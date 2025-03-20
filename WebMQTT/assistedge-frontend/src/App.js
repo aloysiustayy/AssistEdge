@@ -4,6 +4,7 @@ import SignLanguagePage from "./components/SignLanguage";
 import VideoFeed from "./components/VideoFeed";
 import SpeechToText from "./components/SpeechToText";
 import Dashboard from "./components/Dashboard";
+import About from "./components/About";
 import "./App.css";
 
 function App() {
@@ -14,9 +15,10 @@ function App() {
         <nav className="navbar">
           <h2 className="logo">AssistEdge</h2>
           <ul className="nav-links">
-            <li><Link to="/sign">Sign Language</Link></li>
-            <li><Link to="/video">Video Feed</Link></li>
+          <li><Link to="/about">About</Link></li>
+            <li><Link to="/sign">Sign Language To Text</Link></li>
             <li><Link to="/speech">Speech To Text</Link></li>
+            <li><Link to="/video">Emotion Recogniser</Link></li>
             <li><Link to="/dashboard">Dashboard</Link></li>
           </ul>
         </nav>
@@ -28,6 +30,7 @@ function App() {
             <Route path="/video" element={<VideoFeed />} />
             <Route path="/speech" element={<SpeechToText />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/about" element={<About />} />
           </Routes>
         </div>
       </div>
