@@ -361,7 +361,7 @@ const Dashboard = () => {
       <br></br>
 
       <div style={{ marginBottom: "40px" }}>
-        <h2>Recognised Letter From Sign Language</h2>
+        <h2>No. of Recognised Letter From Sign Language</h2>
         <Bar
           data={wordChartData}
           options={{
@@ -377,14 +377,14 @@ const Dashboard = () => {
 
       <div style={{ display: "grid", placeItems: "center" }}>
         <div style={{ marginBottom: "80px", width: "500px", height: "500px", textAlign: "center" }}>
-          <h2>Emotion Detected From Video Feed</h2>
+          <h2>No. of Emotion Detected From Video Feed</h2>
           <Pie data={emotionChartData} options={pieChartOptions} />
         </div>
       </div>
 
 
       <div style={{ marginBottom: "10px" }}>
-        <h2>Detected Emotion Word Cloud</h2>
+        <h2>Recognised Emotion Word Cloud</h2>
         {wordCloudData.length > 0 ? (
           <WordCloud
             data={wordCloudData}
@@ -403,7 +403,7 @@ const Dashboard = () => {
 
         {/* Correlation with Emotion Chart */}
         <div style={{ marginBottom: "40px" }}>
-          <h2>Letter Correlation with Emotion (Scatter Plot)</h2>
+          <h2>Correlation Between Recognized Letters and Emotions</h2>
           <Scatter
             data={correlationChartData}
             options={scatterPlotOptions}
