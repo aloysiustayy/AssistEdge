@@ -26,7 +26,7 @@ After activating the virtual environment, do the following:\
 `cd AssistEdge/WebMQTT/flask_app`\
 `pip install -r requirements.txt`\
 `cd ../assistedge-frontend`\
-`npm install`
+`npm install --legacy-peer-deps`
 
 ### 4. Run the everything
 #### 4.1 On Raspberry Pi
