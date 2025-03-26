@@ -43,7 +43,7 @@ After activating the virtual environment, do the following:\
 `cd ../EmotionDetection`\
 `pip install -r requirements.txt`\
 `cd ../AudioDetection`\
-`pip install -r requirements.txt`\
+`pip install -r requirements.txt`
 
 #### 3.2 On Local computer
 After activating the virtual environment, do the following:\
