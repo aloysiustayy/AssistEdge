@@ -7,15 +7,13 @@ Every day, individuals who rely on sign language or are visually impaired face s
 # Methodology and Proposed Solutions
 AssistEdge aims to offer real-time sign language translation, speech-to-text and text-to-speech conversion, and facial emotion recognition.
 
-1. Hardware Setup: Two Raspberry Pi devices are used, each equipped with a webcam for data collection. One of the Raspberry Pis is also connected to a speaker for audio output. A laptop runs the Flask server for processing.
+1. Hardware Setup: Three Raspberry Pi devices are used, each equipped with a webcam for data collection. One of the Raspberry Pi is also connected to a speaker for audio output. A laptop runs the Flask server for processing.
 
-2. Communication Protocol: An MQTT broker enables real-time, lightweight messaging between Raspberry Pi devices and the web server, while POST requests are used to send larger data payloads, such as processed video or transcriptions, for storage or further processing.
+2. Data Transmission: An MQTT broker enables real-time, lightweight messaging between Raspberry Pi devices and the web server, while POST requests are used to send larger data payloads, such as processed video or transcriptions, for storage or further processing.Socket-IO is employed for Facial Emotion Recognition to transfer base64-encoded frame from edge device to Flask backend, and finally retrieved from the React frontend as it is faster than MQTT after comparison.
 
-3. Data Collection and Processing: Each Raspberry Pi manages its own video and audio tasks. The webcams capture video data, while the Raspberry Pi connected to the speaker handles audio output. These devices process their respective data locally.
+3. Data Collection and Processing: Each Raspberry Pi manages its own video and audio tasks. The webcams capture video data, while the Raspberry Pi connected to the speaker handles audio output. For Speech To Text, the microphone capture voice data. These devices process their respective data locally.
 
-4. Data Transmission: For sign language translation and speech/ text conversion, MQTT is used to publish or subscribe to relevant topics. For facial emotion recognition, POST request is used to send data to the Flask server.
-
-5. Web Interface: A web interface built using React will display the translation, conversion, and emotion recognition results in real time. There is also a dashboard detailing the usage, xx, and xx. 
+4. Web Interface: A web interface built using React to display the Sign Language translation, Emotion Recognition results, Speech To Text results in real time. There is also a dashboard detailing the usage, xx, and xx. 
 
 ## Architecture Diagram
 ![architecture](./Images/architecture.jpg)
