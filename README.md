@@ -18,7 +18,7 @@ AssistEdge aims to offer real-time sign language translation, speech-to-text and
 5. Web Interface: A web interface built using React will display the translation, conversion, and emotion recognition results in real time. There is also a dashboard detailing the usage, xx, and xx. 
 
 ## Architecture Diagram
-TBC
+![architecture](./Images/architecture.jpg)
 
 # Installation
 ## Prerequisite
