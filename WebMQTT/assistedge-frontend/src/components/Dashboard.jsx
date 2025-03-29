@@ -376,8 +376,8 @@ const Dashboard = () => {
       </div>
 
       <div style={{ display: "grid", placeItems: "center" }}>
-        <div style={{ marginBottom: "80px", width: "500px", height: "500px", textAlign: "center" }}>
-          <h2>No. of Emotion Detected From Video Feed</h2>
+        <div style={{ marginBottom: "80px", width: "700px", height: "500px", justifyContent: "center", placeItems: "center",  }}>
+          <h2>No. of Emotion Recognised From Emotion Recogniser</h2>
           <Pie data={emotionChartData} options={pieChartOptions} />
         </div>
       </div>
