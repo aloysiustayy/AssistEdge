@@ -108,14 +108,13 @@ broker_config = {
     'auth': {
         'allow-anonymous': True
     },
-    'topic-check': {   # Disable topic-checking to avoid warnings
+    'topic-check': {  
         'enabled': False
     }
 }
 
 def run_broker():
-    # This function runs in a separate process.
-    from hbmqtt.broker import Broker  # Re-import in the child process
+    from hbmqtt.broker import Broker  
     broker = Broker(broker_config)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -131,8 +130,8 @@ def run_broker():
 # Global Data Store for MQTT Messages
 # ---------------------------
 data_store = {
-    "sign_language": [],  # Data from sign language Raspberry Pi
-    "speech": [],
+    "sign_language": [], 
+    "speech": [],        
 }
 
 # ---------------------------
@@ -302,7 +301,6 @@ def handle_disconnect():
 
 @socketio.on('frame')
 def handle_frame(data):
-    # Optionally re-emit the frame data if needed
     socketio.emit('new_frame', data)
 
     """Handles data from Raspberry Pi (Emotion Recognition & Speech-to-Text)."""
