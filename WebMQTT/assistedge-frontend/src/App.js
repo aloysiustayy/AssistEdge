@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import SignLanguagePage from "./components/SignLanguage";
 import VideoFeed from "./components/VideoFeed";
-import SpeechToText from "./components/SpeechToText";
+import SpeechToTextPage from "./components/SpeechToText";
 import Dashboard from "./components/Dashboard";
 import About from "./components/About";
 import "./App.css";
@@ -28,7 +28,7 @@ function App() {
           <Routes>
             <Route path="/sign" element={<SignLanguagePage />} />
             <Route path="/video" element={<VideoFeed />} />
-            <Route path="/speech" element={<SpeechToText />} />
+            <Route path="/speech" element={<SpeechToTextPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/about" element={<About />} />
           </Routes>

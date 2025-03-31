@@ -412,7 +412,7 @@ const Dashboard = () => {
 
         {/* Frequent Word-Emotion Pairs Chart */}
         <div style={{ marginBottom: "40px" }}>
-          <h2>Top 10 Word-Emotion Pairs</h2>
+          <h2>Top 10 Letter-Emotion Pairs</h2>
           <Bar
             data={wordEmotionChartData}
             options={{

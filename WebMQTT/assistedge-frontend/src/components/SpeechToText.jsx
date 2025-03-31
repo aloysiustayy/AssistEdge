@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-const SignLanguagePage = () => {
+const SpeechToTextPage = () => {
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ const SignLanguagePage = () => {
 
   return (
     <div>
-      <h2>Sign Language to Text</h2>
+      <h2>Speech to Text</h2>
       <div
         style={{
           border: "1px solid #ccc",
@@ -65,4 +65,4 @@ const SignLanguagePage = () => {
   );
 };
 
-export default SignLanguagePage;
+export default SpeechToTextPage;

@@ -33,7 +33,7 @@ const AboutPage = () => {
         <div style={{ textAlign: "left", margin: "auto", maxWidth: "600px" }}>
           <h3 style={{ color: "#555", marginBottom: "5px" }}>🔠 Sign Language to Text</h3>
           <p style={{ fontSize: "16px", lineHeight: "1.6", color: "#666" }}>
-            Converts sign language to text in real-time, enhancing communication for individuals who are deaf or hard of hearing.
+            Converts sign language to text in real-time, enhancing communication for individuals who are deaf or sign language users.
           </p>
 
           <h3 style={{ color: "#555", marginBottom: "5px" }}>🎤 Speech to Text</h3>
@@ -43,7 +43,7 @@ const AboutPage = () => {
 
           <h3 style={{ color: "#555", marginBottom: "5px" }}>😊 Emotion Recogniser</h3>
           <p style={{ fontSize: "16px", lineHeight: "1.6", color: "#666" }}>
-            Detects emotions from a video feed, providing real-time emotional insights.
+            Recognises emotions from a video feed, providing real-time emotional insights.
           </p>
 
           <h3 style={{ color: "#555", marginBottom: "5px" }}>📊 Dashboard</h3>
