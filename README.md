@@ -13,7 +13,7 @@ AssistEdge aims to offer real-time sign language translation, speech-to-text and
 
 3. Data Collection and Processing: Each Raspberry Pi manages its own video and audio tasks. The webcams capture video data, while the Raspberry Pi connected to the speaker handles audio output. For Speech To Text, the microphone capture voice data. These devices process their respective data locally.
 
-4. Web Interface: A web interface built using React to display the Sign Language translation, Emotion Recognition results, Speech To Text results in real time. There is also a dashboard detailing the usage, xx, and xx. 
+4. Web Interface: A web interface built using React to display the Sign Language translation, Emotion Recognition results, Speech To Text results in real time. There is also a dashboard detailing the correlation between letters and emotions, and much more insights.
 
 ## Architecture Diagram
 ![architecture](./Images/architecture.jpg)
