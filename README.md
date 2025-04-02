@@ -88,3 +88,42 @@ Parameters:\
 
 ### 5. Results
 Go to `http://<localhost-ip>:3000` and view the output
+
+
+### 6. Experiments (Things the Team tested / tried)
+- **Facial Emotion Recognition (FER)**
+
+      Issue: Real-time video streaming of FER with HTTP Post Request was choppy, laggy, with fps averaging around 1~5
+
+      Background: Sending of frames require sending from Edge devices to React Frontend, going through Web Server (Flask)
+
+      Tested / Tried: 
+         1. The team shifted to using MQTT and fps increased by a small margin
+         2. Looking for improvement, the team used Socket.IO, which further improved FPS by a landslide
+         
+      Conclusion: Socket.IO is more suitable for real-time video streaming than MQTT and HTTP Post Request which is why the team sticked with Socket.IO
+
+- **Sign Language Translation**
+
+      Issue: Unable to find suitable .tflite or .h5 models online that works plug-and-play
+
+      Background: Looking for .tflite or .h5 models that is able to do inference on edge devices. Some existing models are laggy in terms of infering speed on the edge device, or unable to detect hand signs. Some also did not release the labels that they trained the model with, which made it difficult to use the model.
+
+      Tested / Tried: 
+         1. The team tried a few more models from Kaggle, with the same disappointing results
+         2. Decided to manually train a model. Looked for datasets online and trained a simple model with Keras Sequential CNN library, managed to achieve relatively accurate sign-to-text translation after testing with learning rate, pixel shape size, number of epoch.
+         
+      Conclusion: After multiple attempts on trying to use models that are available online, the team decided to use the self-trained model as it is functional, relatively accurate, and runs efficiently on the edge device
+      
+      
+- **Dashboard**
+
+      Issue: Unable to use react-word-cloud library as it depended on a old version of React
+
+      Background: Word Cloud is a good and simple way to efficiently show stakeholders what is the most commonly appeared word, which in our project, is the most commonly detected emotion.
+
+      Tested / Tried: 
+         1. Tried to uninstall and install the React version that the library was dependent on, however, to no avail even after clearing out node_modules folder and clear cache
+         2. After extensive research, it seems like sticking with the newer React version was possible by including the `--legacy-peer-deps` during `npm install`
+         
+      Conclusion: React word cloud works on the dashboard page and does not cause conflict with other libraries
